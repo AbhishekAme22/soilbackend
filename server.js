@@ -2,7 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 8080;
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -231,7 +231,7 @@ app.post('/customers', checkAdminAuth, async (req, res) => {
   }
 });
 
-
+app.get('/ping',  async (req, res) => {res.status(200).send("pong");})
 app.get('/customers/:id', checkAdminAuth, async (req, res) => {
   try {
     const id = req.params.id;
