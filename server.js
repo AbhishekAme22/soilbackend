@@ -185,6 +185,7 @@ app.post('/customers', checkAdminAuth, async (req, res) => {
       const currentBalance = customer.data().balance || 0;
 
       let newBalance;
+      console.log(currentBalance+"and"+useFromBalance)
       if (currentBalance < useFromBalance) {
         return res.status(400).send('Balance should be greater than or equal to current balance');
       } else {
