@@ -184,28 +184,27 @@ app.post('/customers', checkAdminAuth, async (req, res) => {
       const customer = snapshot.docs[0];
       const currentBalance = customer.data().balance || 0;
 
-      let newBalance 
-      if(currentBalance < useFromBalance) {
-        res.status(200).send({ message: 'Balance should be greater than or equal to current balance:- '+newBalance, id: customer.id });
+      let newBalance;
+      if (currentBalance < useFromBalance) {
+        return res.status(400).send('Balance should be greater than or equal to current balance');
+      } else {
+        newBalance = currentBalance - useFromBalance;
+        await customer.ref.update({ balance: newBalance });
 
-      }else{
-       newBalance = currentBalance - useFromBalance;
+        // Log the transaction
+        await db.collection('transactions').add({
+          customerId: customer.id,
+          phone,
+          date: new Date().toISOString(),
+          amount: total,
+          services,
+          useFromBalance,
+          type: 'Service'
+        });
 
-      await customer.ref.update({ balance: newBalance });
-       // Log the transaction
-
-     await db.collection('transactions').add({
-
-      customerId: customer.ref.id,
-      phone,
-      date: new Date().toISOString(),
-      amount: total,
-      services,
-      useFromBalance,
-      type: 'Service'
-    });
-      res.status(200).send({ message: 'Customer balance updated :- '+newBalance, id: customer.id });
-   } } else {
+        return res.status(200).send({ message: 'Customer balance updated', newBalance, id: customer.id });
+      }
+    } else {
       // Customer doesn't exist, create new
       const newCustomer = {
         phone,
@@ -213,9 +212,11 @@ app.post('/customers', checkAdminAuth, async (req, res) => {
         services,
         balance: total - useFromBalance,
       };
-      const ref = await db.collection('customers').add(newCustomer);
+      const ref = await customersRef.add(newCustomer);
+
+      // Log the transaction for the new customer
       await db.collection('transactions').add({
-        customerId: customerRef.id,
+        customerId: ref.id,
         phone,
         date: new Date().toISOString(),
         amount: total,
@@ -223,13 +224,15 @@ app.post('/customers', checkAdminAuth, async (req, res) => {
         useFromBalance,
         type: 'Service'
       });
-      res.status(201).send({ id: ref.id });
+
+      return res.status(201).send({ message: 'New customer created', id: ref.id });
     }
     
   } catch (error) {
-    res.status(500).send(error.message);
+    return res.status(500).send(error.message);
   }
 });
+
 
 app.get('/ping',  async (req, res) => {res.status(200).send("pong");})
 app.get('/customers/:id', checkAdminAuth, async (req, res) => {
