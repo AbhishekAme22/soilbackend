@@ -211,7 +211,7 @@ app.post('/customers', checkAdminAuth, async (req, res) => {
         phone,
         name,
         services,
-        balance: total - useFromBalance,
+        balance: 0,
       };
       const ref = await customersRef.add(newCustomer);
 
@@ -235,7 +235,7 @@ app.post('/customers', checkAdminAuth, async (req, res) => {
 });
 
 
-app.get('/ping',  async (req, res) => {res.status(200).send("pong");})
+app.get('/ping',  async (req, res) => {res.status(200).send("pong2");})
 app.get('/customers/:id', checkAdminAuth, async (req, res) => {
   try {
     const id = req.params.id;
@@ -615,6 +615,80 @@ app.post('/customers/:customerId/buy-membership', checkAdminAuth, async (req, re
   type: 'Membership'
 });
     res.status(200).send({message:'Membership purchased successfully Current bal',newBalance});
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+// Get the next invoice number
+async function getNextInvoiceNumber() {
+  const invoiceRef = db.collection('invoiceCounter').doc('currentNumber');
+  const doc = await invoiceRef.get();
+
+  let nextNumber = 8520;
+  if (doc.exists) {
+    nextNumber = doc.data().number + 1;
+  }
+
+  // Update the counter in Firestore
+  await invoiceRef.set({ number: nextNumber });
+
+  return nextNumber;
+}
+// Create Invoice
+app.post('/invoices', async (req, res) => {
+  try {
+    const { customerId, invoiceDate, services, currentBalance, subTotal, discount, balanceUsed, total ,latestbalance,pricelist} = req.body;
+
+   
+
+    // Generate new invoice number
+    const invoiceNumber = await getNextInvoiceNumber();
+
+    // Create new invoice
+    const newInvoice = {
+      invoiceNumber,
+      customerId,
+      invoiceDate,
+      services,
+      currentBalance,
+      subTotal,
+      discount,
+      balanceUsed,
+      total,
+      latestbalance,
+      pricelist
+    };
+
+    const invoiceRef = await db.collection('invoices').add(newInvoice);
+    res.status(201).send(`Invoice created with ID: ${invoiceRef.id} and Number: ${invoiceNumber}`);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+// Read Invoices
+app.get('/invoices', async (req, res) => {
+  try {
+    const snapshot = await db.collection('invoices').get();
+    const invoices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.status(200).json(invoices);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+// New endpoint to get a specific invoice by ID
+app.get('/invoices/:invoiceId', async (req, res) => {
+  const invoiceId = req.params.invoiceId;
+
+  try {
+    const invoiceDoc = await db.collection('invoices').doc(invoiceId).get();
+    if (!invoiceDoc.exists) {
+      return res.status(404).send('Invoice not found');
+    }
+
+    const invoiceData = invoiceDoc.data();
+    res.status(200).json({ id: invoiceId, ...invoiceData });
   } catch (error) {
     res.status(500).send(error.message);
   }
